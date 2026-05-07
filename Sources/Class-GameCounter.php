@@ -15,6 +15,7 @@ final class GameCounter
     private const CACHE_VERSION = 4;
     private const ADMIN_GROUP = 1;
     private const VISIBLE_SCORE_ROWS = 10;
+    private const SCORE_BUCKET_SIZE = 106;
 
     public static function hooks(): void
     {
@@ -688,7 +689,11 @@ final class GameCounter
 
         $groups = [];
         foreach ($players as $player)
-            $groups[(int) $player['points']][] = $player;
+        {
+            $bucket = self::scoreBucket((int) ($player['points'] ?? 0));
+            $player['score_overflow'] = $bucket['overflow'];
+            $groups[$bucket['sort']][] = $player;
+        }
 
         krsort($groups, SORT_NUMERIC);
 
@@ -759,10 +764,13 @@ final class GameCounter
                 <tbody>';
 
         $rank = $rank_offset;
-        foreach ($groups as $points => $entries)
+        foreach ($groups as $score => $entries)
         {
             $rank++;
             usort($entries, function ($a, $b) {
+                if ((int) ($a['points'] ?? 0) !== (int) ($b['points'] ?? 0))
+                    return (int) ($b['points'] ?? 0) <=> (int) ($a['points'] ?? 0);
+
                 return strcasecmp($a['name'], $b['name']);
             });
 
@@ -772,7 +780,7 @@ final class GameCounter
 
             $html .= '
                     <tr class="' . ($rank <= 3 ? 'gamecounter-top gamecounter-top-' . $rank : '') . '">
-                        <td class="gamecounter-score">' . (int) $points . '</td>
+                        <td class="gamecounter-score">' . self::formatScoreBucket((int) $score) . '</td>
                         <td class="gamecounter-names">' . implode(', ', $names) . '</td>
                     </tr>';
         }
@@ -784,13 +792,53 @@ final class GameCounter
 
     private static function formatBoardPlayerName(array $player): string
     {
-        $name = self::escape((string) ($player['name'] ?? ''));
-        $malquedas = (int) ($player['malquedas'] ?? 0);
+        global $txt;
 
-        if ($malquedas <= 0)
+        $name = self::escape((string) ($player['name'] ?? ''));
+        $overflow = (int) ($player['score_overflow'] ?? 0);
+        $malquedas = (int) ($player['malquedas'] ?? 0);
+        $notes = [];
+
+        if ($overflow > 0)
+            $notes[] = sprintf($overflow === 1 ? $txt['gamecounter_extra_points_singular'] : $txt['gamecounter_extra_points_plural'], $overflow);
+
+        if ($malquedas > 0)
+            $notes[] = sprintf(self::malquedaCountText($malquedas), $malquedas);
+
+        if (empty($notes))
             return $name;
 
-        return $name . ' <span class="gamecounter-malqueda-note">(' . sprintf(self::malquedaCountText($malquedas), $malquedas) . ')</span>';
+        return $name . ' <span class="gamecounter-malqueda-note">(' . implode(', ', $notes) . ')</span>';
+    }
+
+    private static function scoreBucket(int $points): array
+    {
+        if ($points <= self::SCORE_BUCKET_SIZE)
+            return [
+                'sort' => $points,
+                'overflow' => 0,
+            ];
+
+        $multiplier = intdiv($points, self::SCORE_BUCKET_SIZE);
+        $overflow = $points % self::SCORE_BUCKET_SIZE;
+
+        if ($overflow > 0)
+            $sort = self::SCORE_BUCKET_SIZE * $multiplier;
+        else
+            $sort = $points;
+
+        return [
+            'sort' => $sort,
+            'overflow' => $overflow,
+        ];
+    }
+
+    private static function formatScoreBucket(int $score): string
+    {
+        if ($score > self::SCORE_BUCKET_SIZE && $score % self::SCORE_BUCKET_SIZE === 0)
+            return self::SCORE_BUCKET_SIZE . ' × ' . intdiv($score, self::SCORE_BUCKET_SIZE);
+
+        return (string) $score;
     }
 
     public static function formatPointInline(string $player, int $points): string

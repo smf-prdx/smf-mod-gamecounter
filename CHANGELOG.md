@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.3-106.1
+
+- Adds the CientoSeis-specific 106-point visual buckets on the development-106
+  branch.
+- Shows overflow points next to each player before no-show/malqueda counters.
+
 ## 1.1.3
 
 - Shows only the first 10 scoreboard rows by default and folds the remaining
