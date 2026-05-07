@@ -1,0 +1,128 @@
+.gamecounter-board {
+  margin: 0 0 12px;
+  padding: 14px 16px;
+}
+
+.gamecounter-heading {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.gamecounter-heading h3 {
+  font-size: 1.1em;
+  margin: 0;
+}
+
+.gamecounter-meta,
+.gamecounter-empty {
+  color: #666;
+  font-size: 0.9em;
+}
+
+.gamecounter-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.gamecounter-table th,
+.gamecounter-table td {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 7px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.gamecounter-table thead th {
+  border-top: 0;
+  color: #555;
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+.gamecounter-score {
+  font-weight: 700;
+  white-space: nowrap;
+  width: 6rem;
+}
+
+.gamecounter-top-1 .gamecounter-score,
+.gamecounter-top-2 .gamecounter-score,
+.gamecounter-top-3 .gamecounter-score {
+  color: #7a4b00;
+}
+
+.gamecounter-names {
+  line-height: 1.45;
+}
+
+.gamecounter-point {
+  background: #edf7ee;
+  border: 1px solid #c7e5cb;
+  border-radius: 4px;
+  color: #245b2d;
+  display: inline-block;
+  font-weight: 700;
+  margin: 0 2px 2px 0;
+  padding: 1px 6px;
+}
+
+.gamecounter-malqueda {
+  background: #fff3e5;
+  border: 1px solid #e8c89f;
+  border-radius: 4px;
+  color: #744700;
+  display: inline-block;
+  font-weight: 700;
+  margin: 0 2px 2px 0;
+  padding: 1px 6px;
+}
+
+.gamecounter-malqueda-note {
+  color: #9a5b00;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+.gamecounter-init-bbc {
+  border-left: 3px solid #888;
+  margin: 8px 0;
+  padding: 6px 10px;
+}
+
+.gamecounter-init-lines {
+  line-height: 1.45;
+  margin: 6px 0 0;
+}
+
+@media (max-width: 600px) {
+  .gamecounter-board {
+    padding: 12px;
+  }
+
+  .gamecounter-table,
+  .gamecounter-table thead,
+  .gamecounter-table tbody,
+  .gamecounter-table tr,
+  .gamecounter-table th,
+  .gamecounter-table td {
+    display: block;
+  }
+
+  .gamecounter-table thead {
+    display: none;
+  }
+
+  .gamecounter-table tr {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 7px 0;
+  }
+
+  .gamecounter-table td {
+    border-top: 0;
+    padding: 2px 0;
+  }
+}

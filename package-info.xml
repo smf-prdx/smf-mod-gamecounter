@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package-info xmlns="http://www.simplemachines.org/xml/package-info">
+    <id>prdx:gamecounter</id>
+    <name>Game Counter</name>
+    <version>1.1.0</version>
+    <type>modification</type>
+    <install for="2.1.*">
+        <readme parsebbc="false" type="file">README.md</readme>
+        <license type="file" parsebbc="false">LICENSE</license>
+        <hook hook="integrate_pre_load" function="GameCounter::hooks#" file="$sourcedir/Class-GameCounter.php" />
+        <redirect url="?action=admin;area=modsettings;sa=gamecounter" />
+        <require-file name="Sources/Class-GameCounter.php" destination="$sourcedir" />
+        <require-file name="Themes/default/css/GameCounter.css" destination="$themedir/css" />
+        <require-dir name="Languages/GameCounter" destination="$languagedir" />
+    </install>
+    <uninstall for="2.1.*">
+        <hook hook="integrate_pre_load" function="GameCounter::hooks#" file="$sourcedir/Class-GameCounter.php" reverse="true" />
+        <remove-file name="$sourcedir/Class-GameCounter.php" />
+        <remove-file name="$themedir/css/GameCounter.css" />
+        <remove-dir name="$languagedir/GameCounter" />
+    </uninstall>
+</package-info>
