@@ -1,6 +1,6 @@
 .gamecounter-board {
   margin: 0 0 12px;
-  padding: 14px 16px;
+  padding: 10px 14px;
 }
 
 .gamecounter-heading {
@@ -9,7 +9,7 @@
   flex-wrap: wrap;
   gap: 6px 14px;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .gamecounter-heading h3 {
@@ -31,7 +31,7 @@
 .gamecounter-table th,
 .gamecounter-table td {
   border-top: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 7px 8px;
+  padding: 4px 7px;
   text-align: left;
   vertical-align: top;
 }
@@ -39,7 +39,7 @@
 .gamecounter-table thead th {
   border-top: 0;
   color: #555;
-  font-size: 0.85em;
+  font-size: 0.78em;
   text-transform: uppercase;
 }
 
@@ -56,7 +56,28 @@
 }
 
 .gamecounter-names {
-  line-height: 1.45;
+  line-height: 1.3;
+}
+
+.gamecounter-more {
+  margin-top: 4px;
+}
+
+.gamecounter-more summary {
+  color: #346;
+  cursor: pointer;
+  display: inline-block;
+  font-size: 0.9em;
+  font-weight: 700;
+  padding: 4px 7px 2px;
+}
+
+.gamecounter-more[open] summary {
+  margin-bottom: 2px;
+}
+
+.gamecounter-table-secondary tr:first-child td {
+  border-top-color: rgba(0, 0, 0, 0.12);
 }
 
 .gamecounter-point {
@@ -64,6 +85,17 @@
   border: 1px solid #c7e5cb;
   border-radius: 4px;
   color: #245b2d;
+  display: inline-block;
+  font-weight: 700;
+  margin: 0 2px 2px 0;
+  padding: 1px 6px;
+}
+
+.gamecounter-point-invalid {
+  background: #fff8d9;
+  border: 1px solid #ead17a;
+  border-radius: 4px;
+  color: #6a5200;
   display: inline-block;
   font-weight: 700;
   margin: 0 2px 2px 0;
@@ -100,7 +132,7 @@
 
 @media (max-width: 600px) {
   .gamecounter-board {
-    padding: 12px;
+    padding: 10px;
   }
 
   .gamecounter-table,
@@ -118,11 +150,11 @@
 
   .gamecounter-table tr {
     border-top: 1px solid rgba(0, 0, 0, 0.08);
-    padding: 7px 0;
+    padding: 4px 0;
   }
 
   .gamecounter-table td {
     border-top: 0;
-    padding: 2px 0;
+    padding: 1px 0;
   }
 }

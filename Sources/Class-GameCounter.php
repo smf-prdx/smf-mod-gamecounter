@@ -12,8 +12,9 @@ if (!defined('SMF'))
 
 final class GameCounter
 {
-    private const CACHE_VERSION = 2;
+    private const CACHE_VERSION = 4;
     private const ADMIN_GROUP = 1;
+    private const VISIBLE_SCORE_ROWS = 10;
 
     public static function hooks(): void
     {
@@ -160,7 +161,12 @@ final class GameCounter
             'after' => '',
             'validate' => function (&$tag, &$data) {
                 $point = GameCounter::parseGamepointSpec($data);
-                $tag['before'] = $point === null ? '' : GameCounter::formatPointInline($point['player'], $point['points']);
+                if ($point === null)
+                    $tag['before'] = '';
+                elseif (empty($point['valid']))
+                    $tag['before'] = GameCounter::formatInvalidPointInline($point['player'], $point['points']);
+                else
+                    $tag['before'] = GameCounter::formatPointInline($point['player'], $point['points']);
             },
         ];
 
@@ -312,8 +318,6 @@ final class GameCounter
 
         $blocked = self::blockedUsers();
         $players = [];
-        $events = 0;
-        $malqueda_events = 0;
         $baseline_msg = 0;
 
         $request = $smcFunc['db_query']('', '
@@ -344,8 +348,6 @@ final class GameCounter
                 if ($initial !== null)
                 {
                     $players = $initial;
-                    $events = 0;
-                    $malqueda_events = 0;
                     $baseline_msg = (int) $row['id_msg'];
 
                     $initial_malquedas = self::extractInitialMalquedas($body);
@@ -365,8 +367,6 @@ final class GameCounter
                     self::clearMalquedas($players);
                     foreach ($initial_malquedas as $malqueda)
                         self::addMalquedas($players, $malqueda['player'], $malqueda['count']);
-
-                    $malqueda_events = 0;
                     continue;
                 }
             }
@@ -375,16 +375,10 @@ final class GameCounter
                 continue;
 
             foreach (self::extractGamepoints($body) as $point)
-            {
                 self::addPoints($players, $point['player'], $point['points']);
-                $events += $point['points'];
-            }
 
             foreach (self::extractMalquedas($body) as $malqueda)
-            {
                 self::addMalquedas($players, $malqueda['player'], $malqueda['count']);
-                $malqueda_events += $malqueda['count'];
-            }
         }
 
         $smcFunc['db_free_result']($request);
@@ -396,15 +390,28 @@ final class GameCounter
             return $b['points'] <=> $a['points'];
         });
 
+        $total_points = self::sumPlayerField($players, 'points');
+        $total_malquedas = self::sumPlayerField($players, 'malquedas');
+
         return [
             'version' => self::CACHE_VERSION,
             'topic' => $topic_id,
             'players' => array_values($players),
-            'events' => $events,
-            'malquedas' => $malqueda_events,
+            'events' => $total_points,
+            'malquedas' => $total_malquedas,
             'baseline_msg' => $baseline_msg,
             'updated' => time(),
         ];
+    }
+
+    private static function sumPlayerField(array $players, string $field): int
+    {
+        $total = 0;
+
+        foreach ($players as $player)
+            $total += (int) ($player[$field] ?? 0);
+
+        return $total;
     }
 
     private static function stripIgnoredBlocks(string $body): string
@@ -498,7 +505,7 @@ final class GameCounter
         foreach ($matches[1] as $spec)
         {
             $point = self::parseGamepointSpec($spec);
-            if ($point !== null)
+            if ($point !== null && !empty($point['valid']))
                 $points[] = $point;
         }
 
@@ -544,7 +551,7 @@ final class GameCounter
             if ($parsed !== null)
             {
                 $points = $parsed;
-                $player = trim(preg_replace('~\s+(?:(?:points?|puntos?)\s*=\s*\d+|\+\d+)\s*$~i', '', $spec));
+                $player = trim(preg_replace('~\s+(?:(?:points?|puntos?)\s*=\s*[+-]?\d+|[+-]\d+)\s*$~i', '', $spec));
             }
         }
 
@@ -552,11 +559,14 @@ final class GameCounter
         if ($player === '')
             return null;
 
-        $points = max(1, min(self::maxPoints(), $points));
+        $valid = $points > 0;
+        if ($valid)
+            $points = min(self::maxPoints(), $points);
 
         return [
             'player' => $player,
             'points' => $points,
+            'valid' => $valid,
         ];
     }
 
@@ -605,11 +615,14 @@ final class GameCounter
         if ($value === '')
             return null;
 
-        if (preg_match('~(?:^|\s)(?:points?|puntos?)\s*=\s*(\d+)\s*$~i', $value, $match))
+        if (preg_match('~(?:^|\s)(?:points?|puntos?)\s*=\s*([+-]?\d+)\s*$~i', $value, $match))
             return (int) $match[1];
 
         if (preg_match('~(?:^|\s)\+(\d+)\s*$~', $value, $match))
             return (int) $match[1];
+
+        if (preg_match('~(?:^|\s)-(\d+)\s*$~', $value, $match))
+            return -(int) $match[1];
 
         return null;
     }
@@ -698,17 +711,54 @@ final class GameCounter
             return $html;
         }
 
+        $visible_groups = array_slice($groups, 0, self::VISIBLE_SCORE_ROWS, true);
+        $hidden_groups = array_slice($groups, self::VISIBLE_SCORE_ROWS, null, true);
+
+        $html .= self::renderBoardTable($visible_groups, true);
+
+        if (!empty($hidden_groups))
+        {
+            $hidden_count = count($hidden_groups);
+            $summary = sprintf(
+                $hidden_count === 1 ? $txt['gamecounter_show_more_singular'] : $txt['gamecounter_show_more_plural'],
+                $hidden_count
+            );
+
+            $html .= '
+            <details class="gamecounter-more">
+                <summary>' . self::escape($summary) . '</summary>' .
+                self::renderBoardTable($hidden_groups, false, self::VISIBLE_SCORE_ROWS) . '
+            </details>';
+        }
+
         $html .= '
-            <table class="gamecounter-table">
+        </section>';
+
+        return $html;
+    }
+
+    private static function renderBoardTable(array $groups, bool $with_header, int $rank_offset = 0): string
+    {
+        global $txt;
+
+        $html = '
+            <table class="gamecounter-table' . ($with_header ? '' : ' gamecounter-table-secondary') . '">';
+
+        if ($with_header)
+        {
+            $html .= '
                 <thead>
                     <tr>
                         <th scope="col">' . $txt['gamecounter_points'] . '</th>
                         <th scope="col">' . $txt['gamecounter_players'] . '</th>
                     </tr>
-                </thead>
+                </thead>';
+        }
+
+        $html .= '
                 <tbody>';
 
-        $rank = 0;
+        $rank = $rank_offset;
         foreach ($groups as $points => $entries)
         {
             $rank++;
@@ -727,12 +777,9 @@ final class GameCounter
                     </tr>';
         }
 
-        $html .= '
+        return $html . '
                 </tbody>
-            </table>
-        </section>';
-
-        return $html;
+            </table>';
     }
 
     private static function formatBoardPlayerName(array $player): string
@@ -753,6 +800,15 @@ final class GameCounter
         self::localLoadLanguage();
 
         return '<span class="gamecounter-point">' . sprintf($txt['gamecounter_point_inline'], self::escape($player), (int) $points) . '</span> ';
+    }
+
+    public static function formatInvalidPointInline(string $player, int $points): string
+    {
+        global $txt;
+
+        self::localLoadLanguage();
+
+        return '<span class="gamecounter-point-invalid">' . sprintf($txt['gamecounter_point_invalid_inline'], self::escape($player), (int) $points) . '</span> ';
     }
 
     public static function formatMalquedaInline(string $player, int $count): string

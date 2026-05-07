@@ -19,6 +19,9 @@ Award multiple points, up to the admin configured limit:
 [gamepoint=Paradox points=3]
 ```
 
+Values of 0 or negative values are shown as invalid in the post and are not
+counted until the tag is edited.
+
 Add a custom visible note:
 
 ```bbc

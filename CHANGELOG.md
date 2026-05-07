@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.3
+
+- Shows only the first 10 scoreboard rows by default and folds the remaining
+  rows into an integrated expandable section.
+- Makes the scoreboard table more compact.
+
+## 1.1.2
+
+- Makes the scoreboard metadata count total accumulated points from the final
+  table, including initial scores and multi-point awards.
+- Makes the no-show/malqueda metadata count the final accumulated total.
+- Bumps the internal cache version so existing topic summaries are rebuilt.
+
+## 1.1.1
+
+- Treats `[gamepoint=Name points=0]` and negative point values as invalid tags
+  instead of folding the suffix into the player name.
+- Bumps the internal cache version so existing topic scoreboards are rebuilt.
+
 ## 1.1.0
 
 - Adds `[malqueda=Name]` and `[noshow=Name]` secondary counters.
