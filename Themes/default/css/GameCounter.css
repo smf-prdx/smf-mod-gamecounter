@@ -91,7 +91,8 @@
   padding: 1px 6px;
 }
 
-.gamecounter-point-invalid {
+.gamecounter-point-invalid,
+.gamecounter-player-invalid {
   background: #fff8d9;
   border: 1px solid #ead17a;
   border-radius: 4px;
