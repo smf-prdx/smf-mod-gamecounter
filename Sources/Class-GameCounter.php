@@ -12,7 +12,7 @@ if (!defined('SMF'))
 
 final class GameCounter
 {
-    private const CACHE_VERSION = 4;
+    private const CACHE_VERSION = 5;
     private const ADMIN_GROUP = 1;
     private const VISIBLE_SCORE_ROWS = 10;
     private const SCORE_BUCKET_SIZE = 106;
@@ -101,6 +101,7 @@ final class GameCounter
             ['text', 'gamecounter_title', 40],
             ['large_text', 'gamecounter_topics', 5],
             ['large_text', 'gamecounter_blocked_users', 5],
+            ['check', 'gamecounter_require_existing_players'],
             ['int', 'gamecounter_max_points', 6, 'min' => 1, 'max' => 99],
             ['int', 'gamecounter_cache_ttl', 6, 'min' => 60, 'max' => 86400],
             ['check', 'gamecounter_show_empty'],
@@ -164,6 +165,8 @@ final class GameCounter
                 $point = GameCounter::parseGamepointSpec($data);
                 if ($point === null)
                     $tag['before'] = '';
+                elseif (($point['reason'] ?? '') === 'unknown_player')
+                    $tag['before'] = GameCounter::formatUnknownPlayerInline($point['player']);
                 elseif (empty($point['valid']))
                     $tag['before'] = GameCounter::formatInvalidPointInline($point['player'], $point['points']);
                 else
@@ -180,7 +183,12 @@ final class GameCounter
                 'after' => '',
                 'validate' => function (&$tag, &$data) {
                     $malqueda = GameCounter::parseMalquedaSpec($data);
-                    $tag['before'] = $malqueda === null ? '' : GameCounter::formatMalquedaInline($malqueda['player'], $malqueda['count']);
+                    if ($malqueda === null)
+                        $tag['before'] = '';
+                    elseif (($malqueda['reason'] ?? '') === 'unknown_player')
+                        $tag['before'] = GameCounter::formatUnknownPlayerInline($malqueda['player']);
+                    else
+                        $tag['before'] = GameCounter::formatMalquedaInline($malqueda['player'], $malqueda['count']);
                 },
             ];
         }
@@ -191,9 +199,8 @@ final class GameCounter
             'block_level' => true,
             'content' => '<div class="gamecounter-init-bbc">$1</div>',
             'validate' => function (&$tag, &$data) use ($txt) {
-                $data = preg_replace('~<br\s*/?>~i', "\n", $data);
-                $data = nl2br(GameCounter::escape(strip_tags($data)), false);
-                $tag['content'] = '<div class="gamecounter-init-bbc"><strong>' . $txt['gamecounter_init_label'] . '</strong><div class="gamecounter-init-lines">$1</div></div>';
+                $data = GameCounter::formatInitialBlockLines($data, 'points');
+                $tag['content'] = '<div class="gamecounter-init-bbc"><strong>' . $txt['gamecounter_init_label'] . '</strong><div class="gamecounter-init-lines">' . $data . '</div></div>';
             },
         ];
 
@@ -203,9 +210,8 @@ final class GameCounter
             'block_level' => true,
             'content' => '<div class="gamecounter-init-bbc">$1</div>',
             'validate' => function (&$tag, &$data) use ($txt) {
-                $data = preg_replace('~<br\s*/?>~i', "\n", $data);
-                $data = nl2br(GameCounter::escape(strip_tags($data)), false);
-                $tag['content'] = '<div class="gamecounter-init-bbc"><strong>' . $txt['gamecounter_init_malquedas_label'] . '</strong><div class="gamecounter-init-lines">$1</div></div>';
+                $data = GameCounter::formatInitialBlockLines($data, 'malquedas');
+                $tag['content'] = '<div class="gamecounter-init-bbc"><strong>' . $txt['gamecounter_init_malquedas_label'] . '</strong><div class="gamecounter-init-lines">' . $data . '</div></div>';
             },
         ];
     }
@@ -457,6 +463,12 @@ final class GameCounter
             foreach ($names as $name)
             {
                 $name = self::normalizePlayerName($name);
+                $resolved = self::resolvePlayerName($name);
+                if (!empty($resolved['valid']))
+                    $name = $resolved['player'];
+                else
+                    $name = '';
+
                 if ($name !== '')
                     self::addPoints($players, $name, $points);
             }
@@ -489,6 +501,12 @@ final class GameCounter
             foreach ($names as $name)
             {
                 $name = self::normalizePlayerName($name);
+                $resolved = self::resolvePlayerName($name);
+                if (!empty($resolved['valid']))
+                    $name = $resolved['player'];
+                else
+                    $name = '';
+
                 if ($name !== '')
                     $malquedas[] = ['player' => $name, 'count' => $count];
             }
@@ -522,11 +540,59 @@ final class GameCounter
         foreach ($matches[1] as $spec)
         {
             $malqueda = self::parseMalquedaSpec($spec);
-            if ($malqueda !== null)
+            if ($malqueda !== null && !empty($malqueda['valid']))
                 $malquedas[] = $malqueda;
         }
 
         return $malquedas;
+    }
+
+    public static function formatInitialBlockLines(string $data, string $type): string
+    {
+        $data = preg_replace('~<br\s*/?>~i', "\n", $data);
+        $lines = preg_split('~\R+~', strip_tags($data));
+        $formatted = [];
+        $pattern = $type === 'malquedas'
+            ? '~^\s*(\d+)\s*(?:malquedas?|no-?shows?)?\s*[:=-]\s*(.+)$~i'
+            : '~^\s*(\d+)\s*(?:puntos?|points?)?\s*[:=-]\s*(.+)$~i';
+
+        foreach ($lines as $line)
+        {
+            $line = trim($line);
+            if ($line === '')
+                continue;
+
+            if (!preg_match($pattern, $line, $match))
+            {
+                $formatted[] = self::escape($line);
+                continue;
+            }
+
+            $names = [];
+            foreach (preg_split('~\s*,\s*~', $match[2]) as $name)
+                $names[] = self::formatInitialPlayerName($name);
+
+            $formatted[] = (int) $match[1] . ': ' . implode(', ', $names);
+        }
+
+        return implode('<br>', $formatted);
+    }
+
+    private static function formatInitialPlayerName(string $name): string
+    {
+        global $txt;
+
+        self::localLoadLanguage();
+
+        $player = self::normalizePlayerName($name);
+        if ($player === '')
+            return '';
+
+        $resolved = self::resolvePlayerName($player);
+        if (!empty($resolved['valid']))
+            return self::escape($resolved['player']);
+
+        return '<span class="gamecounter-player-invalid">' . sprintf($txt['gamecounter_unknown_player_inline'], self::escape($player)) . '</span>';
     }
 
     public static function parseGamepointSpec(string $spec): ?array
@@ -564,10 +630,25 @@ final class GameCounter
         if ($valid)
             $points = min(self::maxPoints(), $points);
 
+        if ($valid)
+        {
+            $resolved = self::resolvePlayerName($player);
+            if (empty($resolved['valid']))
+                return [
+                    'player' => $player,
+                    'points' => $points,
+                    'valid' => false,
+                    'reason' => 'unknown_player',
+                ];
+
+            $player = $resolved['player'];
+        }
+
         return [
             'player' => $player,
             'points' => $points,
             'valid' => $valid,
+            'reason' => $valid ? '' : 'invalid_points',
         ];
     }
 
@@ -604,9 +685,20 @@ final class GameCounter
 
         $count = max(1, min(99, $count));
 
+        $resolved = self::resolvePlayerName($player);
+        if (empty($resolved['valid']))
+            return [
+                'player' => $player,
+                'count' => $count,
+                'valid' => false,
+                'reason' => 'unknown_player',
+            ];
+
         return [
-            'player' => $player,
+            'player' => $resolved['player'],
             'count' => $count,
+            'valid' => true,
+            'reason' => '',
         ];
     }
 
@@ -859,6 +951,15 @@ final class GameCounter
         return '<span class="gamecounter-point-invalid">' . sprintf($txt['gamecounter_point_invalid_inline'], self::escape($player), (int) $points) . '</span> ';
     }
 
+    public static function formatUnknownPlayerInline(string $player): string
+    {
+        global $txt;
+
+        self::localLoadLanguage();
+
+        return '<span class="gamecounter-player-invalid">' . sprintf($txt['gamecounter_unknown_player_inline'], self::escape($player)) . '</span> ';
+    }
+
     public static function formatMalquedaInline(string $player, int $count): string
     {
         global $txt;
@@ -942,9 +1043,77 @@ final class GameCounter
         return in_array(self::ADMIN_GROUP, $additional, true);
     }
 
+    private static function requireExistingPlayers(): bool
+    {
+        global $modSettings;
+
+        return !empty($modSettings['gamecounter_require_existing_players']);
+    }
+
+    private static function resolvePlayerName(string $player): array
+    {
+        global $smcFunc;
+
+        $player = self::normalizePlayerName($player);
+        if ($player === '')
+            return ['valid' => false, 'player' => '', 'reason' => 'empty'];
+
+        if (!self::requireExistingPlayers())
+            return ['valid' => true, 'player' => $player, 'reason' => ''];
+
+        static $cache = [];
+
+        $key = self::normalizeKey($player);
+        if (isset($cache[$key]))
+            return $cache[$key];
+
+        $lookup = isset($smcFunc['strtolower']) ? $smcFunc['strtolower']($player) : strtolower($player);
+        $request = $smcFunc['db_query']('', '
+            SELECT id_member, real_name, member_name
+            FROM {db_prefix}members
+            WHERE ({raw:real_name} = {string:player}
+                OR {raw:member_name} = {string:player})
+                AND is_activated IN (1, 11)
+            LIMIT 2',
+            [
+                'real_name' => !empty($smcFunc['db_case_sensitive']) ? 'LOWER(real_name)' : 'real_name',
+                'member_name' => !empty($smcFunc['db_case_sensitive']) ? 'LOWER(member_name)' : 'member_name',
+                'player' => $lookup,
+            ]
+        );
+
+        $matches = [];
+        while ($row = $smcFunc['db_fetch_assoc']($request))
+            $matches[] = $row;
+        $smcFunc['db_free_result']($request);
+
+        if (count($matches) === 1)
+        {
+            $cache[$key] = [
+                'valid' => true,
+                'player' => self::normalizePlayerName($matches[0]['real_name']),
+                'reason' => '',
+            ];
+        }
+        else
+        {
+            $cache[$key] = [
+                'valid' => false,
+                'player' => $player,
+                'reason' => 'unknown_player',
+            ];
+        }
+
+        return $cache[$key];
+    }
+
     private static function normalizePlayerName(string $name): string
     {
         $name = trim(self::decodeEntities(strip_tags($name)));
+        $name = str_replace("\xc2\xa0", ' ', $name);
+        $name = preg_replace('~[\x{200B}\x{200C}\x{200D}\x{FEFF}]~u', '', $name);
+        $name = preg_replace('~^@+~', '', $name);
+        $name = trim($name);
         $name = preg_replace('~\s+~', ' ', $name);
 
         global $smcFunc;

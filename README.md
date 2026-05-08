@@ -36,6 +36,13 @@ Mark a player as a no-show, known in Spanish as a "malqueda":
 [noshow=Paradox]
 ```
 
+SMF mention-style names are accepted:
+
+```bbc
+[gamepoint=@Paradox]
+[malqueda=@Paradox]
+```
+
 Initialize a legacy scoreboard. Only blocks posted by administrators are used
 for scoring:
 
@@ -70,7 +77,10 @@ Open:
 ```
 
 Configure active topic IDs, blocked point authors, the scoreboard title, cache
-lifetime, and the maximum number of points that one tag may award.
+lifetime, the maximum number of points that one tag may award, and whether
+players must exist as activated forum members. When member validation is
+enabled, names are matched exactly against forum usernames and display names;
+invalid names are shown as warnings and are not counted.
 
 ## Implementation Notes
 

@@ -1,10 +1,24 @@
 # Changelog
 
+## 1.1.4-106.1
+
+- Merges GameCounter 1.1.4 member validation into the CientoSeis-specific
+  branch.
+
 ## 1.1.3-106.1
 
 - Adds the CientoSeis-specific 106-point visual buckets on the development-106
   branch.
 - Shows overflow points next to each player before no-show/malqueda counters.
+
+## 1.1.4
+
+- Adds an optional admin setting to require game players to exist as activated
+  forum members.
+- Accepts SMF mention-style `@Name` values and stores the canonical display
+  name when the member exists.
+- Shows invalid-player warnings in point, no-show, and initialization tags.
+- Bumps the internal cache version so existing topic scoreboards are rebuilt.
 
 ## 1.1.3
 
